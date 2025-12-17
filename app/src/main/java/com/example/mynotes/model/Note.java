@@ -12,7 +12,9 @@ public class Note implements Serializable {
     private String nom;         // Titre de la note
     private String description; // Contenu détaillé
     private String date;        // Date formatée en String (ex: "17/12/2025")
-    private String priority;    // "Basse", "Moyenne", "Haute"
+    private String priority;
+
+    private String imageBase64;// "Basse", "Moyenne", "Haute"
 
     // Constructeur
     public Note(String nom, String description, String date, String priority) {
@@ -33,4 +35,13 @@ public class Note implements Serializable {
     public void setDescription(String description) { this.description = description; }
     public void setDate(String date) { this.date = date; }
     public void setPriority(String priority) { this.priority = priority; }
+
+    // Les méthodes pour y accéder (Getters/Setters)
+    public String getImageBase64() {
+        return imageBase64;
+    }
+
+    public void setImageBase64(String imageBase64) {
+        this.imageBase64 = imageBase64;
+    }
 }

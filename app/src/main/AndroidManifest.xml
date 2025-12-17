@@ -3,7 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
-
     <uses-feature android:name="android.hardware.camera" android:required="true" />
 
     <application
@@ -25,8 +24,14 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".ui.activities.AddNoteActivity" />
-        <activity android:name=".ui.activities.DetailsNoteActivity" />
+        <activity
+            android:name=".ui.activities.AddNoteActivity"
+            android:parentActivityName=".ui.activities.NoteListActivity" />
+
+        <activity
+            android:name=".ui.activities.DetailsNoteActivity"
+            android:parentActivityName=".ui.activities.NoteListActivity" />
+
         <activity android:name=".ui.activities.CameraActivity" />
 
     </application>
