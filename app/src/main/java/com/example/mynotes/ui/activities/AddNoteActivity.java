@@ -2,6 +2,7 @@ package com.example.mynotes.ui.activities;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory; // <--- Import nécessaire pour décoder l'image
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Base64;
@@ -11,6 +12,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
+import android.widget.TextView; // <--- Pour changer le titre de l'écran si besoin
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -33,13 +35,18 @@ public class AddNoteActivity extends AppCompatActivity {
     private EditText etTitle, etDesc;
     private Spinner spinnerPriority;
 
-    // Boutons d'action (Enregistrer et Annuler)
+    // Boutons d'action
     private Button btnSave, btnCancel;
 
-    // Nouveaux composants pour la caméra
+    // Composants pour la caméra
     private ImageView ivPreview;
     private Button btnPhoto;
-    private String currentPhotoBase64 = null; // Stockage de l'image convertie
+    private String currentPhotoBase64 = null;
+
+    // --- VARIABLE D'ÉTAT POUR LA MODIFICATION ---
+    // Si -1 : on est en mode Création.
+    // Si >= 0 : on est en mode Modification (c'est l'index de la note).
+    private int notePositionToEdit = -1;
 
     private static final int REQUEST_IMAGE_CAPTURE = 1;
 
@@ -48,7 +55,6 @@ public class AddNoteActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_note);
 
-        // Active la flèche retour native en haut à gauche
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
@@ -57,18 +63,32 @@ public class AddNoteActivity extends AppCompatActivity {
         etTitle = findViewById(R.id.et_title);
         etDesc = findViewById(R.id.et_desc);
         spinnerPriority = findViewById(R.id.spinner_priority);
-
-        // Liaison des boutons du bas
         btnSave = findViewById(R.id.btn_save);
-        btnCancel = findViewById(R.id.btn_cancel); // <-- AJOUT IMPORTANT
-
-        // Liaison Caméra
+        btnCancel = findViewById(R.id.btn_cancel);
         ivPreview = findViewById(R.id.iv_preview);
         btnPhoto = findViewById(R.id.btn_take_photo_inline);
 
         setupSpinner();
 
-        // 2. Gestion du clic Photo
+        // 2. --- DÉTECTION DU MODE MODIFICATION ---
+        // On regarde si l'intent contient "EXTRA_POSITION"
+        if (getIntent().hasExtra("EXTRA_POSITION")) {
+            notePositionToEdit = getIntent().getIntExtra("EXTRA_POSITION", -1);
+
+            if (notePositionToEdit != -1) {
+                // On est en mode MODIFICATION : on pré-remplit les champs
+                prefillData(notePositionToEdit);
+
+                // On change le texte du bouton pour que ce soit clair
+                btnSave.setText("Modifier");
+
+                // Optionnel : Changer le titre de l'écran si tu as un ID pour le TextView du titre
+                // TextView tvScreenTitle = findViewById(R.id.tv_screen_title);
+                // if(tvScreenTitle != null) tvScreenTitle.setText("Modifier la note");
+            }
+        }
+
+        // 3. Listeners
         btnPhoto.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -76,7 +96,6 @@ public class AddNoteActivity extends AppCompatActivity {
             }
         });
 
-        // 3. Gestion du clic Enregistrer
         btnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -84,7 +103,6 @@ public class AddNoteActivity extends AppCompatActivity {
             }
         });
 
-        // 4. Gestion du clic Annuler (Ferme l'écran sans sauver)
         btnCancel.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -93,7 +111,45 @@ public class AddNoteActivity extends AppCompatActivity {
         });
     }
 
-    // --- Méthodes pour la Caméra ---
+    /**
+     * Remplit le formulaire avec les données de la note existante
+     */
+    private void prefillData(int position) {
+        // On récupère la note depuis le Singleton
+        Note note = NoteManager.getInstance().getNotes().get(position);
+
+        // A. Textes
+        etTitle.setText(note.getNom());
+        etDesc.setText(note.getDescription());
+
+        // B. Priorité (Spinner)
+        // Il faut trouver l'index qui correspond au texte ("Haute", "Moyenne"...)
+        String p = note.getPriority();
+        if (p != null) {
+            if (p.equals("Moyenne")) {
+                spinnerPriority.setSelection(1);
+            } else if (p.equals("Haute")) {
+                spinnerPriority.setSelection(2);
+            } else {
+                spinnerPriority.setSelection(0); // Basse par défaut
+            }
+        }
+
+        // C. Photo
+        // Si la note avait déjà une photo, on l'affiche et on la stocke en mémoire
+        if (note.getImageBase64() != null && !note.getImageBase64().isEmpty()) {
+            currentPhotoBase64 = note.getImageBase64();
+            try {
+                byte[] decodedString = Base64.decode(currentPhotoBase64, Base64.DEFAULT);
+                Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+                ivPreview.setImageBitmap(decodedByte);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // --- Méthodes Caméra (Inchangées) ---
 
     private void dispatchTakePictureIntent() {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
@@ -110,11 +166,7 @@ public class AddNoteActivity extends AppCompatActivity {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
             Bundle extras = data.getExtras();
             Bitmap imageBitmap = (Bitmap) extras.get("data");
-
-            // Affiche la miniature
             ivPreview.setImageBitmap(imageBitmap);
-
-            // Convertit l'image en texte pour la sauvegarder
             currentPhotoBase64 = bitmapToString(imageBitmap);
         }
     }
@@ -125,8 +177,6 @@ public class AddNoteActivity extends AppCompatActivity {
         byte[] b = baos.toByteArray();
         return Base64.encodeToString(b, Base64.DEFAULT);
     }
-
-    // --- Méthodes Classiques ---
 
     private void setupSpinner() {
         List<String> priorities = new ArrayList<>();
@@ -143,12 +193,14 @@ public class AddNoteActivity extends AppCompatActivity {
         spinnerPriority.setAdapter(adapter);
     }
 
+    // --- Logique de Sauvegarde Intelligente ---
+
     private void saveNote() {
         String title = etTitle.getText().toString().trim();
         String desc = etDesc.getText().toString().trim();
         String priority = spinnerPriority.getSelectedItem().toString();
 
-        // DATE AUTOMATIQUE (Plus besoin de saisir)
+        // On met à jour la date pour montrer que la note a été modifiée
         String date = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date());
 
         if (title.isEmpty()) {
@@ -156,19 +208,28 @@ public class AddNoteActivity extends AppCompatActivity {
             return;
         }
 
-        Note newNote = new Note(title, desc, date, priority);
+        // Création de l'objet Note
+        Note noteObj = new Note(title, desc, date, priority);
 
-        // Ajout de l'image si elle existe
+        // Si on a une photo (soit l'ancienne récupérée, soit une nouvelle prise), on l'ajoute
         if (currentPhotoBase64 != null) {
-            newNote.setImageBase64(currentPhotoBase64);
+            noteObj.setImageBase64(currentPhotoBase64);
         }
 
-        NoteManager.getInstance().addNote(newNote);
-        Toast.makeText(this, "Note enregistrée !", Toast.LENGTH_SHORT).show();
+        // --- C'EST ICI QUE TOUT CHANGE ---
+        if (notePositionToEdit != -1) {
+            // MODE MODIFICATION : On remplace l'ancienne note à l'index précis
+            NoteManager.getInstance().getNotes().set(notePositionToEdit, noteObj);
+            Toast.makeText(this, "Note modifiée !", Toast.LENGTH_SHORT).show();
+        } else {
+            // MODE CRÉATION : On ajoute à la fin de la liste
+            NoteManager.getInstance().addNote(noteObj);
+            Toast.makeText(this, "Note ajoutée !", Toast.LENGTH_SHORT).show();
+        }
+
         finish();
     }
 
-    // Gère le clic sur la flèche retour de la barre d'action (en haut à gauche)
     @Override
     public boolean onSupportNavigateUp() {
         finish();
